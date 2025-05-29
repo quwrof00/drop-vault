@@ -1,6 +1,3 @@
-// src/components/Sidebar.tsx
-import React from "react";
-
 const Sidebar = ({ onSelect, activeSection }: { onSelect: (section: string) => void; activeSection?: string }) => {
   const sections = [
     { name: "Images", icon: "🖼️" },
