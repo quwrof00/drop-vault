@@ -1,4 +1,3 @@
-
 import { get, set } from "idb-keyval";
 import { supabase } from "../../lib/supabase-client";
 import { useAuthUser } from "../../hooks/useAuthUser";
@@ -166,9 +165,7 @@ export default function Images() {
       setRenamingFile(null);
       return;
     }
-    
-
-    // Preserve file extension
+  
     const oldExtIndex = oldName.lastIndexOf(".");
     const oldExt = oldExtIndex !== -1 ? oldName.slice(oldExtIndex) : "";
     const newExtIndex = newNameInput.lastIndexOf(".");

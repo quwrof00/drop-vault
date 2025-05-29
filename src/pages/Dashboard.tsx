@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
-    const user = useAuthUser();
+  const user = useAuthUser();
   const navigate = useNavigate();
   const [counts, setCounts] = useState<{
   images: number;
@@ -41,8 +41,8 @@ export default function Dashboard() {
         ] = await Promise.all([
           supabase.storage.from("user-images").list(`${user.id}`),
           supabase.storage.from("user-files").list(`${user.id}`),
-          supabase.from("notes").select("*", { count: "exact", head: true }),
-          supabase.from("codes").select("*", { count: "exact", head: true })
+          supabase.from("notes").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+          supabase.from("codes").select("*", { count: "exact", head: true }).eq("user_id", user.id)
         ]);
 
         if (imageError || fileError || noteError || codeError) {
