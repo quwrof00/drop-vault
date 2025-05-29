@@ -11,8 +11,11 @@ type FileEntry = {
   blob: Blob;
   uploaded: boolean;
   lastModified: number;
-  progress: number; // 0 to 100
+  progress: number;
+  url?: string;         
+  previewUrl?: string;  
 };
+
 
 const isImageFile = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase();
@@ -50,22 +53,41 @@ export default function Images() {
 
     const mergedFiles: { [key: string]: FileEntry } = { ...localFiles };
 
-    supabaseFiles?.forEach((file) => {
-      if (!mergedFiles[file.name]) {
-        mergedFiles[file.name] = {
-          name: file.name,
-          blob: new Blob(),
-          uploaded: true,
-          lastModified: new Date(file.updated_at || file.created_at || Date.now()).getTime(),
-          progress: 100,
-        };
-      }
-    });
+supabaseFiles?.forEach((file) => {
+  if (!mergedFiles[file.name]) {
+    const publicUrl = getPublicUrl(file.name);
+    mergedFiles[file.name] = {
+      name: file.name,
+      blob: new Blob(),  // empty blob
+      uploaded: true,
+      lastModified: new Date(file.updated_at || file.created_at || Date.now()).getTime(),
+      progress: 100,
+      url: publicUrl,
+      previewUrl: publicUrl,  // Use the public URL as preview for uploaded files
+    };
+  } else {
+    // For local files, generate previewUrl if missing
+    if (!mergedFiles[file.name].previewUrl && mergedFiles[file.name].blob) {
+      mergedFiles[file.name].previewUrl = URL.createObjectURL(mergedFiles[file.name].blob);
+    }
+  }
+});
 
     setFiles(mergedFiles);
     await set(FILES_KEY, mergedFiles); // Update local cache
   })();
 }, [user, navigate]);
+
+useEffect(() => {
+  return () => {
+    Object.values(files).forEach((file) => {
+      if (file.previewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(file.previewUrl);
+      }
+    });
+  };
+}, [files]);
+
 
 
   if (user === undefined) {
@@ -152,12 +174,14 @@ export default function Images() {
     }
 
     const newEntry: FileEntry = {
-      name: file.name,
-      blob: file,
-      uploaded: false,
-      lastModified: file.lastModified,
-      progress: 0,
-    };
+  name: file.name,
+  blob: file,
+  uploaded: false,
+  lastModified: file.lastModified,
+  progress: 0,
+  previewUrl: URL.createObjectURL(file),  // create URL here once
+};
+
 
     const updated = {
       ...files,
@@ -286,20 +310,18 @@ export default function Images() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredFiles.map(([name, file]) => {
-          const objectUrl = URL.createObjectURL(file.blob);
+  return (
+    <div
+      key={name}
+      className="bg-gray-50 rounded-md shadow-sm hover:shadow-md transition-shadow p-4"
+    >
+      <div className="relative">
+        <img
+          src={file.previewUrl}
+          alt={name}
+          className="w-full h-48 object-cover rounded-md mb-3"
+        />
 
-          return (
-            <div
-              key={name}
-              className="bg-gray-50 rounded-md shadow-sm hover:shadow-md transition-shadow p-4"
-            >
-              <div className="relative">
-                <img
-                  src={objectUrl}
-                  alt={name}
-                  className="w-full h-48 object-cover rounded-md mb-3"
-                  onLoad={() => URL.revokeObjectURL(objectUrl)}
-                />
                 {!file.uploaded && renamingFile !== name && (
                   <div className="absolute bottom-0 w-full bg-gray-200 rounded-b-md h-2">
                     <div
