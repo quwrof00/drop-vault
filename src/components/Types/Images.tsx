@@ -28,18 +28,45 @@ export default function Images() {
   const [newFileName, setNewFileName] = useState<string>("");
 
   useEffect(() => {
-    if (user === undefined) return;
-    if (!user) {
-      navigate("/login");
+  if (user === undefined) return;
+  if (!user) {
+    navigate("/login");
+    return;
+  }
+
+  (async () => {
+    const FILES_KEY = getFilesKey(user.id);
+    const localFiles = (await get(FILES_KEY)) || {};
+
+    const { data: supabaseFiles, error } = await supabase.storage
+      .from("user-images")
+      .list(user.id);
+
+    if (error) {
+      console.error("Failed to fetch Supabase files", error);
+      setFiles(localFiles); // fallback
       return;
     }
 
-    (async () => {
-      const FILES_KEY = getFilesKey(user.id);
-      const localFiles = (await get(FILES_KEY)) || {};
-      setFiles(localFiles);
-    })();
-  }, [user, navigate]);
+    const mergedFiles: { [key: string]: FileEntry } = { ...localFiles };
+
+    supabaseFiles?.forEach((file) => {
+      if (!mergedFiles[file.name]) {
+        mergedFiles[file.name] = {
+          name: file.name,
+          blob: new Blob(),
+          uploaded: true,
+          lastModified: new Date(file.updated_at || file.created_at || Date.now()).getTime(),
+          progress: 100,
+        };
+      }
+    });
+
+    setFiles(mergedFiles);
+    await set(FILES_KEY, mergedFiles); // Update local cache
+  })();
+}, [user, navigate]);
+
 
   if (user === undefined) {
     return <p className="text-center mt-10 text-gray-500 text-lg">Loading...</p>;
