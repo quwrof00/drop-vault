@@ -24,11 +24,11 @@ const isImageFile = (name: string) => {
 export default function Images() {
   const user = useAuthUser();
   const getPublicUrl = (fileName: string) => {
-  const { data } = supabase.storage
-    .from("user-images")
-    .getPublicUrl(`${user?.id}/${fileName}`);
-  return data.publicUrl;
-};
+    const { data } = supabase.storage
+      .from("user-images")
+      .getPublicUrl(`${user?.id}/${fileName}`);
+    return data.publicUrl;
+  };
   const navigate = useNavigate();
   const [files, setFiles] = useState<{ [key: string]: FileEntry }>({});
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,7 +70,7 @@ export default function Images() {
             lastModified: new Date(file.updated_at || file.created_at || Date.now()).getTime(),
             progress: 100,
             url: publicUrl,
-            previewUrl: publicUrl, // fix: show Supabase-hosted image preview
+            previewUrl: publicUrl,
           };
         } else {
           if (!mergedFiles[fileName].previewUrl && mergedFiles[fileName].blob) {
@@ -288,140 +288,140 @@ export default function Images() {
     .sort(([, a], [, b]) => b.lastModified - a.lastModified);
 
   return (
-  <div className="p-6 space-y-6 bg-white rounded-lg shadow-sm">
-    <div className="flex flex-col sm:flex-row gap-4">
-      <label className="flex-1">
+    <div className="p-6 space-y-6 bg-white rounded-lg shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <label className="flex-1">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
+          />
+        </label>
         <input
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
+          type="text"
+          placeholder="Search images..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 placeholder-gray-400"
         />
-      </label>
-      <input
-        type="text"
-        placeholder="Search images..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="flex-1 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 placeholder-gray-400"
-      />
-    </div>
+      </div>
 
-    {filteredFiles.length === 0 && (
-      <p className="text-center text-gray-500">No images found. Upload some!</p>
-    )}
+      {filteredFiles.length === 0 && (
+        <p className="text-center text-gray-500">No images found. Upload some!</p>
+      )}
 
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {filteredFiles.map(([name, file]) => (
-        <div key={name} className="bg-gray-50 rounded-md shadow-sm hover:shadow-md transition-shadow p-4">
-          <div className="relative">
-            <img
-              src={file.previewUrl}
-              alt={name}
-              className="w-full h-48 object-cover rounded-md mb-3"
-            />
-            {!file.uploaded && renamingFile !== name && (
-              <div className="absolute bottom-0 w-full bg-gray-200 rounded-b-md h-2">
-                <div
-                  className="bg-blue-500 h-2 rounded-b-md transition-all duration-300"
-                  style={{ width: `${file.progress}%` }}
-                />
-              </div>
-            )}
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredFiles.map(([name, file]) => (
+          <div key={name} className="bg-gray-50 rounded-md shadow-sm hover:shadow-md transition-shadow p-4">
+            <div className="relative">
+              <img
+                src={file.url || file.previewUrl} // Changed to prioritize Supabase url
+                alt={name}
+                className="w-full h-48 object-cover rounded-md mb-3"
+              />
+              {!file.uploaded && renamingFile !== name && (
+                <div className="absolute bottom-0 w-full bg-gray-200 rounded-b-md h-2">
+                  <div
+                    className="bg-blue-500 h-2 rounded-b-md transition-all duration-300"
+                    style={{ width: `${file.progress}%` }}
+                  />
+                </div>
+              )}
+            </div>
 
-          <div className="space-y-2">
-            {renamingFile === name ? (
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  className="flex-1 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-                  value={newFileName}
-                  onChange={(e) => setNewFileName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleRename(name, newFileName.trim());
+            <div className="space-y-2">
+              {renamingFile === name ? (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    className="flex-1 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleRename(name, newFileName.trim());
+                      }
+                      if (e.key === "Escape") {
+                        setRenamingFile(null);
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleRename(name, newFileName.trim())}
+                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setRenamingFile(null)}
+                    className="text-gray-500 hover:text-gray-700 px-3 py-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-800 truncate">{name}</span>
+                  <span
+                    className={
+                      file.uploaded
+                        ? "text-green-600 text-sm"
+                        : "text-yellow-600 text-sm"
                     }
-                    if (e.key === "Escape") {
-                      setRenamingFile(null);
-                    }
-                  }}
-                  autoFocus
-                />
-                <button
-                  onClick={() => handleRename(name, newFileName.trim())}
-                  className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setRenamingFile(null)}
-                  className="text-gray-500 hover:text-gray-700 px-3 py-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-800 truncate">{name}</span>
-                <span
-                  className={
-                    file.uploaded
-                      ? "text-green-600 text-sm"
-                      : "text-yellow-600 text-sm"
-                  }
-                >
-                  {file.uploaded ? "✅ Uploaded" : "⏳ Uploading"}
-                </span>
-              </div>
-            )}
+                  >
+                    {file.uploaded ? "✅ Uploaded" : "⏳ Uploading"}
+                  </span>
+                </div>
+              )}
 
-            {file.uploaded && renamingFile !== name && (
-              <div className="flex gap-3">
-                <a
-                  href={getPublicUrl(name)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                >
-                  🔍 Preview
-                </a>
-                <a
-                  href={getPublicUrl(name)}
-                  download={name}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                >
-                  ⬇️ Download
-                </a>
-              </div>
-            )}
+              {file.uploaded && renamingFile !== name && (
+                <div className="flex gap-3">
+                  <a
+                    href={getPublicUrl(name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    🔍 Preview
+                  </a>
+                  <a
+                    href={getPublicUrl(name)}
+                    download={name}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    ⬇️ Download
+                  </a>
+                </div>
+              )}
 
-            {renamingFile !== name && (
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setRenamingFile(name);
-                    setNewFileName(name);
-                  }}
-                  className="text-yellow-600 hover:text-yellow-800"
-                  title="Rename image"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => handleDelete(name)}
-                  className="text-red-500 hover:text-red-700"
-                  title="Delete image"
-                >
-                  ❌
-                </button>
-              </div>
-            )}
+              {renamingFile !== name && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setRenamingFile(name);
+                      setNewFileName(name);
+                    }}
+                    className="text-yellow-600 hover:text-yellow-800"
+                    title="Rename image"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDelete(name)}
+                    className="text-red-500 hover:text-red-700"
+                    title="Delete image"
+                  >
+                    ❌
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
 }
