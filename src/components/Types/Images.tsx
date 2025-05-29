@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const getFilesKey = (userId: string) => `my_image_files_${userId}`;
-const user = useAuthUser();
 
 type FileEntry = {
   name: string;
@@ -22,16 +21,14 @@ const isImageFile = (name: string) => {
   return !!ext && ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(ext);
 };
 
-// Moved here: get public URL for a file
-const getPublicUrl = (fileName: string) => {
+export default function Images() {
+  const user = useAuthUser();
+  const getPublicUrl = (fileName: string) => {
   const { data } = supabase.storage
     .from("user-images")
     .getPublicUrl(`${user?.id}/${fileName}`);
   return data.publicUrl;
 };
-
-export default function Images() {
-  
   const navigate = useNavigate();
   const [files, setFiles] = useState<{ [key: string]: FileEntry }>({});
   const [searchTerm, setSearchTerm] = useState("");
