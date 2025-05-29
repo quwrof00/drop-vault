@@ -56,7 +56,7 @@ export default function Files() {
   const getPublicUrl = (fileName: string) => {
     const { data } = supabase.storage
       .from("user-files")
-      .getPublicUrl(`${user.id}/${fileName}`);
+      .getPublicUrl(`${user?.id}/${fileName}`);
     return data.publicUrl;
   };
 

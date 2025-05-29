@@ -6,14 +6,22 @@ import { useNavigate } from "react-router-dom";
 export default function Dashboard() {
     const user = useAuthUser();
   const navigate = useNavigate();
-  const [counts, setCounts] = useState({
-    images: 0,
-    files: 0,
-    notes: 0,
-    codes: 0,
-    loading: true,
-    error: null
-  });
+  const [counts, setCounts] = useState<{
+  images: number;
+  files: number;
+  notes: number;
+  codes: number;
+  loading: boolean;
+  error: string | null;
+}>({
+  images: 0,
+  files: 0,
+  notes: 0,
+  codes: 0,
+  loading: true,
+  error: null,
+});
+
 
   useEffect(() => {
     
@@ -49,14 +57,15 @@ export default function Dashboard() {
           loading: false,
           error: null
         });
-      } catch (error) {
-        console.error(error);
-        setCounts(prev => ({
-          ...prev,
-          loading: false,
-          error: error.message
-        }));
-      }
+      } catch (error: any) {
+          console.error(error);
+          setCounts(prev => ({
+    ...prev,
+    loading: false,
+    error: error?.message || "Unknown error",
+  }));
+}
+
     };
 
     fetchData();
@@ -148,7 +157,15 @@ export default function Dashboard() {
   );
 }
 
-function DashboardCard({ title, count, icon, color, onClick }) {
+type DashboardCardProps = {
+  title: string;
+  count: number;
+  icon: string;
+  color: string;
+  onClick: () => void;
+};
+
+function DashboardCard({ title, count, icon, color, onClick }: DashboardCardProps) {
   return (
     <div 
       className={`bg-gradient-to-br ${color} rounded-xl p-6 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02]`}

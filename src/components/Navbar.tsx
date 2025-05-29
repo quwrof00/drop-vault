@@ -1,26 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase-client";
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useAuthUser } from "../hooks/useAuthUser";
 
 export function Navbar() {
-  const location = useLocation();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data?.user);
-    };
-
-    fetchUser();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
+  const user = useAuthUser();
 
   const navigate = useNavigate();
   
@@ -29,7 +12,6 @@ export function Navbar() {
     if (error) {
       console.error(error.message);
     }
-    setUser(null);
     navigate('/login');
   }
 

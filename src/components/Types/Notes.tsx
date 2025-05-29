@@ -69,7 +69,7 @@ export default function Notes() {
             content: text,
           },
           {
-            onConflict: ["user_id", "title"],
+            onConflict: "user_id,title",
           }
         );
 

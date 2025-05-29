@@ -49,7 +49,7 @@ export default function Images() {
   const getPublicUrl = (fileName: string) => {
     const { data } = supabase.storage
       .from("user-images")
-      .getPublicUrl(`${user.id}/${fileName}`);
+      .getPublicUrl(`${user?.id}/${fileName}`);
     return data.publicUrl;
   };
 

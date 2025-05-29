@@ -90,7 +90,7 @@ export default function Codes() {
             code: snippetToSave.code,
             language: snippetToSave.language,
           },
-          { onConflict: ["user_id", "title"] }
+          { onConflict: "user_id,title" }
         );
 
       if (error) console.error("Sync failed:", error.message);
@@ -196,7 +196,7 @@ export default function Codes() {
     const {error: codeChangeError} = await supabase
     .from("codes")
     .update({code: code})
-    .eq("user_id", user.id)
+    .eq("user_id", user?.id)
     .eq("title", title)
   };
 
