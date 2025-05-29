@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase-client";
 import Compiler from "../Compiler";
 import CodeEditor from "@uiw/react-textarea-code-editor";
 
-const getSnippetsKey = (userId: string) => `my_code_snippets_${userId}`;
+const getSnippetsKey = (userId: string) => `my_code_snippets_${userId}`; //getting the key for local state
 
 const languages = [
   { label: "C", value: "c" },
@@ -25,9 +25,9 @@ export default function Codes() {
   const user = useAuthUser();
   const navigate = useNavigate();
 
-  const [snippets, setSnippets] = useState<{ [title: string]: Snippet }>({});
-  const [currentTitle, setCurrentTitle] = useState("");
-  const [search, setSearch] = useState("");
+  const [snippets, setSnippets] = useState<{ [title: string]: Snippet }>({}); //stores all codes 
+  const [currentTitle, setCurrentTitle] = useState(""); //stores current title
+  const [search, setSearch] = useState(""); //stores search query
 
   // Load snippets from IDB + Supabase when user changes
   useEffect(() => {
@@ -39,30 +39,30 @@ export default function Codes() {
 
     (async () => {
       const SNIPPETS_KEY = getSnippetsKey(user.id);
-      const localSnippets = (await get(SNIPPETS_KEY)) || {};
+      const localSnippets = (await get(SNIPPETS_KEY)) || {}; //get the codes from the local db else empty 
 
       const { data, error } = await supabase
         .from("codes")
         .select("title, code, language")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id); //get the codes from supabase
 
       if (data && !error) {
         const supabaseSnippets: { [key: string]: Snippet } = {};
-        data.forEach(({ title, code, language }) => {
+        data.forEach(({ title, code, language }) => {     //loop over the supabase data to store all codes in an object called supabaseSnippets
           supabaseSnippets[title] = {
             code: code || "",
             language: language || "javascript",
           };
         });
 
-        const merged = { ...supabaseSnippets, ...localSnippets };
+        const merged = { ...supabaseSnippets, ...localSnippets }; //merge both the local codes and supabase codes, obv distinct ones are taken
 
-        setSnippets(merged);
-        await set(SNIPPETS_KEY, merged);
+        setSnippets(merged); //set the codes to the merged object
+        await set(SNIPPETS_KEY, merged); //even in local
 
-        const first = Object.keys(merged)[0];
+        const first = Object.keys(merged)[0]; //get the first key
         if (first) {
-          setCurrentTitle(first);
+          setCurrentTitle(first); //display first code on default render
         }
       }
     })();
@@ -78,7 +78,7 @@ export default function Codes() {
 
       await set(SNIPPETS_KEY, updated);
 
-      const snippetToSave = updated[currentTitle];
+      const snippetToSave = updated[currentTitle]; //get the new code to save
       if (!snippetToSave) return;
 
       const { error } = await supabase
@@ -90,14 +90,14 @@ export default function Codes() {
             code: snippetToSave.code,
             language: snippetToSave.language,
           },
-          { onConflict: "user_id,title" }
+          { onConflict: "user_id,title" } //check if user id and title already exist in the table
         );
 
       if (error) console.error("Sync failed:", error.message);
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [snippets, currentTitle, user]);
+  }, [snippets, currentTitle, user]); //runs only when code, title, or user changes
 
   const handleNewSnippet = async () => {
     if (!user) return;
@@ -170,7 +170,7 @@ export default function Codes() {
       .eq("user_id", user.id)
       .eq("title", title);
 
-    if (title === currentTitle) setCurrentTitle(newTitle);
+    if (title === currentTitle) setCurrentTitle(newTitle); //for instant change in code title, else only works on a reload
   };
 
   const handleLanguageChange = (language: string) => {
@@ -292,13 +292,13 @@ export default function Codes() {
   padding={15}
   style={{
     fontSize: 14,
-    backgroundColor: "#1e1e1e",  // Dark background
-    color: "#d4d4d4",            // Light text color
+    backgroundColor: "#1e1e1e",
+    color: "#d4d4d4",          
     fontFamily:
       "ui-monospace, SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace",
     flex: 1,
     borderRadius: "6px",
-    border: "1px solid #333",    // Darker border
+    border: "1px solid #333",    
     resize: "vertical",
     minHeight: "300px",
   }}
