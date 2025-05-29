@@ -72,13 +72,13 @@ export default function Images() {
         }));
       }, 100);
 
-      const { data, error } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("user-images")
         .upload(path, fileEntry.blob, { upsert: true });
 
       clearInterval(interval);
 
-      if (!error) {
+      if (!uploadError) {
         setFiles((prev) => {
           const updated = {
             ...prev,
@@ -92,8 +92,8 @@ export default function Images() {
           return updated;
         });
       } else {
-        console.error("Upload error:", error);
-        alert(`Upload failed: ${error.message}`);
+        console.error("Upload error:", uploadError);
+        alert(`Upload failed: ${uploadError.message}`);
       }
     } catch (err) {
       console.error("Upload exception:", err);

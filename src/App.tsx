@@ -1,4 +1,3 @@
-import { useState } from "react"
 import {Routes, Route} from "react-router-dom";
 import RegisterPage from "./pages/auth/register";
 import LoginPage from "./pages/auth/login";
@@ -10,7 +9,6 @@ import { ToastContainer } from "react-toastify";
 import Dashboard from "./pages/Dashboard";
 
 function App() {
-  const [section, setSection] = useState("Notes")
 
   return (
     <>

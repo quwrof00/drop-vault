@@ -197,8 +197,10 @@ export default function Codes() {
     .from("codes")
     .update({code: code})
     .eq("user_id", user?.id)
-    .eq("title", title)
+    .eq("title", title);
+    if (codeChangeError) console.log("Error while editing code: ", codeChangeError);
   };
+
 
   const filteredSnippets = Object.keys(snippets)
     .filter((title) => title.toLowerCase().includes(search.toLowerCase()))
