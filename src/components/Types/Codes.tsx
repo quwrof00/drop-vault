@@ -60,10 +60,12 @@ export default function Codes() {
         setSnippets(merged); //set the codes to the merged object
         await set(SNIPPETS_KEY, merged); //even in local
 
-        const first = Object.keys(merged)[0]; //get the first key
-        if (first) {
-          setCurrentTitle(first); //display first code on default render
+        if (!currentTitle || !merged[currentTitle]) {
+        const firstTitle = Object.keys(merged)[0];
+        if (firstTitle) {
+          setCurrentTitle(firstTitle);
         }
+      }
       }
     })();
   }, [user, navigate]);

@@ -15,40 +15,43 @@ export default function Notes() {
   const [search, setSearch] = useState<string>("");
 
   useEffect(() => {
-    if (user === undefined) return;
-    if (!user) {
-      navigate("/login");
-      return;
-    }
+  if (user === undefined) return;
+  if (!user) {
+    navigate("/login");
+    return;
+  }
 
-    (async () => {
-      const NOTES_KEY = getNotesKey(user.id);
-      const localNotes = (await get(NOTES_KEY)) || {};
-      setFiles(localNotes);
+  (async () => {
+    const NOTES_KEY = getNotesKey(user.id);
+    const localNotes = (await get(NOTES_KEY)) || {};
+    setFiles(localNotes);
 
-      const { data: supabaseData, error } = await supabase
-        .from("notes")
-        .select("title, content")
-        .eq("user_id", user.id);
+    const { data: supabaseData, error } = await supabase
+      .from("notes")
+      .select("title, content")
+      .eq("user_id", user.id);
 
-      if (supabaseData && !error) {
-        const supabaseNotes: { [key: string]: string } = {};
-        supabaseData.forEach(({ title, content }) => {
-          supabaseNotes[title] = content;
-        });
+    if (supabaseData && !error) {
+      const supabaseNotes: { [key: string]: string } = {};
+      supabaseData.forEach(({ title, content }) => {
+        supabaseNotes[title] = content;
+      });
 
-        const merged = { ...supabaseNotes, ...localNotes };
-        setFiles(merged);
-        await set(NOTES_KEY, merged);
+      const merged = { ...supabaseNotes, ...localNotes };
+      setFiles(merged);
+      await set(NOTES_KEY, merged);
 
+      if (!currentFile || !merged[currentFile]) {
         const firstFile = Object.keys(merged)[0];
         if (firstFile) {
           setCurrentFile(firstFile);
           setText(merged[firstFile]);
         }
       }
-    })();
-  }, [user, navigate]);
+    }
+  })();
+}, [user, navigate]);
+
 
   // Save changes to IndexedDB + Supabase after text changes
   useEffect(() => {
