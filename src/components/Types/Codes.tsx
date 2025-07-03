@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase-client";
 import Compiler from "../Compiler";
 import CodeEditor from "@uiw/react-textarea-code-editor";
 
-const getSnippetsKey = (userId: string) => `my_code_snippets_${userId}`; //getting the key for local state
+const getSnippetsKey = (userId: string) => `my_code_snippets_${userId}`;
 
 const languages = [
   { label: "C", value: "c" },
@@ -24,12 +24,10 @@ type Snippet = {
 export default function Codes() {
   const user = useAuthUser();
   const navigate = useNavigate();
+  const [snippets, setSnippets] = useState<{ [title: string]: Snippet }>({});
+  const [currentTitle, setCurrentTitle] = useState("");
+  const [search, setSearch] = useState("");
 
-  const [snippets, setSnippets] = useState<{ [title: string]: Snippet }>({}); //stores all codes 
-  const [currentTitle, setCurrentTitle] = useState(""); //stores current title
-  const [search, setSearch] = useState(""); //stores search query
-
-  // Load snippets from IDB + Supabase when user changes
   useEffect(() => {
     if (user === undefined) return;
     if (!user) {
@@ -39,48 +37,45 @@ export default function Codes() {
 
     (async () => {
       const SNIPPETS_KEY = getSnippetsKey(user.id);
-      const localSnippets = (await get(SNIPPETS_KEY)) || {}; //get the codes from the local db else empty 
+      const localSnippets = (await get(SNIPPETS_KEY)) || {};
 
       const { data, error } = await supabase
         .from("codes")
         .select("title, code, language")
-        .eq("user_id", user.id); //get the codes from supabase
+        .eq("user_id", user.id);
 
       if (data && !error) {
         const supabaseSnippets: { [key: string]: Snippet } = {};
-        data.forEach(({ title, code, language }) => {     //loop over the supabase data to store all codes in an object called supabaseSnippets
+        data.forEach(({ title, code, language }) => {
           supabaseSnippets[title] = {
             code: code || "",
             language: language || "javascript",
           };
         });
 
-        const merged = { ...supabaseSnippets, ...localSnippets }; //merge both the local codes and supabase codes, obv distinct ones are taken
-
-        setSnippets(merged); //set the codes to the merged object
-        await set(SNIPPETS_KEY, merged); //even in local
+        const merged = { ...supabaseSnippets, ...localSnippets };
+        setSnippets(merged);
+        await set(SNIPPETS_KEY, merged);
 
         if (!currentTitle || !merged[currentTitle]) {
-        const firstTitle = Object.keys(merged)[0];
-        if (firstTitle) {
-          setCurrentTitle(firstTitle);
+          const firstTitle = Object.keys(merged)[0];
+          if (firstTitle) {
+            setCurrentTitle(firstTitle);
+          }
         }
-      }
       }
     })();
   }, [user, navigate]);
 
-  // Save changes to IDB + Supabase after snippet code or language changes, debounced
   useEffect(() => {
     if (!currentTitle || !user) return;
 
     const timeout = setTimeout(async () => {
       const SNIPPETS_KEY = getSnippetsKey(user.id);
       const updated = { ...snippets };
-
       await set(SNIPPETS_KEY, updated);
 
-      const snippetToSave = updated[currentTitle]; //get the new code to save
+      const snippetToSave = updated[currentTitle];
       if (!snippetToSave) return;
 
       const { error } = await supabase
@@ -92,14 +87,14 @@ export default function Codes() {
             code: snippetToSave.code,
             language: snippetToSave.language,
           },
-          { onConflict: "user_id,title" } //check if user id and title already exist in the table
+          { onConflict: "user_id,title" }
         );
 
       if (error) console.error("Sync failed:", error.message);
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [snippets, currentTitle, user]); //runs only when code, title, or user changes
+  }, [snippets, currentTitle, user]);
 
   const handleNewSnippet = async () => {
     if (!user) return;
@@ -172,7 +167,7 @@ export default function Codes() {
       .eq("user_id", user.id)
       .eq("title", title);
 
-    if (title === currentTitle) setCurrentTitle(newTitle); //for instant change in code title, else only works on a reload
+    if (title === currentTitle) setCurrentTitle(newTitle);
   };
 
   const handleLanguageChange = (language: string) => {
@@ -195,128 +190,128 @@ export default function Codes() {
         code,
       },
     });
-    const {error: codeChangeError} = await supabase
-    .from("codes")
-    .update({code: code})
-    .eq("user_id", user?.id)
-    .eq("title", title);
+    const { error: codeChangeError } = await supabase
+      .from("codes")
+      .update({ code: code })
+      .eq("user_id", user?.id)
+      .eq("title", title);
     if (codeChangeError) console.log("Error while editing code: ", codeChangeError);
   };
-
 
   const filteredSnippets = Object.keys(snippets)
     .filter((title) => title.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-white rounded-lg shadow-sm">
+    <div className="flex h-[calc(100vh-4rem)] bg-gray-700 rounded-lg shadow-md overflow-hidden">
       {/* Sidebar */}
-      <div className="w-full sm:w-1/4 p-4 space-y-4 bg-gray-50 border-r border-gray-200">
-        <div className="flex flex-col gap-3">
+      <div className="w-full sm:w-80 p-6 space-y-6 bg-gray-800 border-r border-gray-600">
+        <div className="flex flex-col gap-4">
           <input
             type="text"
             placeholder="Search snippets..."
-            className="p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 placeholder-gray-400"
+            className="p-3 rounded-lg border border-gray-600 bg-gray-700 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ease-in-out"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           <button
             onClick={handleNewSnippet}
-            className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-semibold"
+            className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 ease-in-out font-semibold text-sm tracking-wide"
           >
             + New Snippet
           </button>
         </div>
-        {filteredSnippets.length === 0 && (
-          <p className="text-center text-gray-500">No snippets found. Create one!</p>
-        )}
-        <div className="space-y-2">
-          {filteredSnippets.map((title) => (
-            <div
-              key={title}
-              className="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 transition-colors"
-            >
-              <span
-                onClick={() => handleSelect(title)}
-                className={`flex-1 cursor-pointer truncate text-gray-800 font-medium ${
-                  title === currentTitle ? "bg-blue-100 text-blue-800" : ""
-                }`}
+        {filteredSnippets.length === 0 ? (
+          <p className="text-center text-gray-400 text-sm font-medium">
+            No snippets found. Create one!
+          </p>
+        ) : (
+          <div className="space-y-1 max-h-[calc(100vh-12rem)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-700">
+            {filteredSnippets.map((title) => (
+              <div
+                key={title}
+                className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-600 transition-all duration-200 ease-in-out"
               >
-                {title}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleRename(title)}
-                  className="text-yellow-600 hover:text-yellow-800"
-                  title="Rename snippet"
+                <span
+                  onClick={() => handleSelect(title)}
+                  className={`flex-1 cursor-pointer truncate text-gray-200 text-sm font-medium ${
+                    title === currentTitle ? "bg-blue-900 text-blue-300 rounded-md px-2 py-1" : ""
+                  }`}
                 >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => handleDelete(title)}
-                  className="text-red-500 hover:text-red-700"
-                  title="Delete snippet"
-                >
-                  ❌
-                </button>
+                  {title}
+                </span>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleRename(title)}
+                    className="text-yellow-500 hover:text-yellow-400 transition-colors duration-150"
+                    title="Rename snippet"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDelete(title)}
+                    className="text-red-500 hover:text-red-400 transition-colors duration-150"
+                    title="Delete snippet"
+                  >
+                    ❌
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Editor */}
-      <div className="w-full sm:w-3/4 p-6 flex flex-col">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-800 truncate">
+      {/* Editor Area */}
+      <div className="flex-1 p-8 overflow-auto bg-gray-700">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-2xl font-semibold text-gray-200 truncate">
             {currentTitle || "No Snippet Selected"}
           </h2>
           <select
-            className="border border-gray-300 rounded-md p-1 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2 rounded-lg border border-gray-600 bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ease-in-out"
             disabled={!currentTitle}
             value={currentTitle ? snippets[currentTitle]?.language : "javascript"}
             onChange={(e) => handleLanguageChange(e.target.value)}
           >
             {languages.map(({ label, value }) => (
-              <option key={value} value={value}>
+              <option key={value} value={value} className="bg-gray-700 text-gray-200">
                 {label}
               </option>
             ))}
           </select>
         </div>
 
-        {currentTitle && (
-          <>
-            <CodeEditor
-  language={snippets[currentTitle].language}
-  value={snippets[currentTitle].code}
-  onChange={(e) => handleCodeChange(currentTitle, e.target.value)}
-  padding={15}
-  style={{
-    fontSize: 14,
-    backgroundColor: "#1e1e1e",
-    color: "#d4d4d4",          
-    fontFamily:
-      "ui-monospace, SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace",
-    flex: 1,
-    borderRadius: "6px",
-    border: "1px solid #333",    
-    resize: "vertical",
-    minHeight: "300px",
-  }}
-/>
-
-            <div className="mt-4 flex-grow">
+        {currentTitle ? (
+          <div className="flex flex-col gap-4">
+            <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-sm">
+              <CodeEditor
+                language={snippets[currentTitle].language}
+                value={snippets[currentTitle].code}
+                onChange={(e) => handleCodeChange(currentTitle, e.target.value)}
+                padding={15}
+                style={{
+                  fontSize: 14,
+                  backgroundColor: "#1f2937",
+                  color: "#e5e7eb",
+                  fontFamily:
+                    "ui-monospace, SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace",
+                  borderRadius: "6px",
+                  border: "1px solid #4b5563",
+                  minHeight: "300px",
+                  flex: 1,
+                }}
+              />
+            </div>
+            <div className="bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-600">
               <Compiler
                 language={snippets[currentTitle].language}
                 code={snippets[currentTitle].code}
               />
             </div>
-          </>
-        )}
-
-        {!currentTitle && (
-          <p className="text-center text-gray-500 mt-10">
+          </div>
+        ) : (
+          <p className="text-gray-400 italic text-base text-center mt-10">
             Select or create a snippet to start coding.
           </p>
         )}

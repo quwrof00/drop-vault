@@ -9,8 +9,8 @@ type MainAreaProps = {
 
 const MainArea = ({ section }: MainAreaProps) => {
   return (
-    <div className="flex-1 p-6 bg-gray-100 min-h-screen">
-      <div className="bg-white border hover:border-gray-900 rounded-lg shadow-sm p-6">
+    <div className="flex-1 border-l-2 border-black bg-gray-900 min-h-screen rounded-none">
+      <div className="bg-gray-900 rounded-lg shadow-sm p-6">
         {section === "Notes" && <Notes />}
         {section === "Images" && <Images />}
         {section === "Files" && <Files />}

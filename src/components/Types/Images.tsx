@@ -23,17 +23,18 @@ const isImageFile = (name: string) => {
 
 export default function Images() {
   const user = useAuthUser();
+  const navigate = useNavigate();
+  const [files, setFiles] = useState<{ [key: string]: FileEntry }>({});
+  const [searchTerm, setSearchTerm] = useState("");
+  const [renamingFile, setRenamingFile] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState<string>("");
+
   const getPublicUrl = (fileName: string) => {
     const { data } = supabase.storage
       .from("user-images")
       .getPublicUrl(`${user?.id}/${fileName}`);
     return data.publicUrl;
   };
-  const navigate = useNavigate();
-  const [files, setFiles] = useState<{ [key: string]: FileEntry }>({});
-  const [searchTerm, setSearchTerm] = useState("");
-  const [renamingFile, setRenamingFile] = useState<string | null>(null);
-  const [newFileName, setNewFileName] = useState<string>("");
 
   useEffect(() => {
     if (user === undefined) return;
@@ -95,7 +96,11 @@ export default function Images() {
   }, [files]);
 
   if (user === undefined) {
-    return <p className="text-center mt-10 text-gray-500 text-lg">Loading...</p>;
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-700">
+        <p className="text-gray-300 text-lg font-medium animate-pulse">Loading...</p>
+      </div>
+    );
   }
 
   const uploadToSupabase = async (fileEntry: FileEntry) => {
@@ -288,14 +293,14 @@ export default function Images() {
     .sort(([, a], [, b]) => b.lastModified - a.lastModified);
 
   return (
-    <div className="p-6 space-y-6 bg-white rounded-lg shadow-sm">
+    <div className="p-6 space-y-6 bg-gray-700 rounded-lg shadow-md">
       <div className="flex flex-col sm:flex-row gap-4">
         <label className="flex-1">
           <input
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
+            className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition-colors duration-150"
           />
         </label>
         <input
@@ -303,25 +308,27 @@ export default function Images() {
           placeholder="Search images..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="flex-1 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 placeholder-gray-400"
+          className="flex-1 p-3 rounded-lg border border-gray-600 bg-gray-700 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ease-in-out"
         />
       </div>
 
       {filteredFiles.length === 0 && (
-        <p className="text-center text-gray-500">No images found. Upload some!</p>
+        <p className="text-center text-gray-400 text-sm font-medium">
+          No images found. Upload some!
+        </p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredFiles.map(([name, file]) => (
-          <div key={name} className="bg-gray-50 rounded-md shadow-sm hover:shadow-md transition-shadow p-4">
+          <div key={name} className="bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
             <div className="relative">
               <img
-                src={file.url || file.previewUrl} // Changed to prioritize Supabase url
+                src={file.url || file.previewUrl}
                 alt={name}
                 className="w-full h-48 object-cover rounded-md mb-3"
               />
               {!file.uploaded && renamingFile !== name && (
-                <div className="absolute bottom-0 w-full bg-gray-200 rounded-b-md h-2">
+                <div className="absolute bottom-0 w-full bg-gray-600 rounded-b-md h-2">
                   <div
                     className="bg-blue-500 h-2 rounded-b-md transition-all duration-300"
                     style={{ width: `${file.progress}%` }}
@@ -335,7 +342,7 @@ export default function Images() {
                 <div className="flex items-center gap-3">
                   <input
                     type="text"
-                    className="flex-1 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                    className="flex-1 p-2 rounded-md border border-gray-600 bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                     value={newFileName}
                     onChange={(e) => setNewFileName(e.target.value)}
                     onKeyDown={(e) => {
@@ -351,25 +358,25 @@ export default function Images() {
                   />
                   <button
                     onClick={() => handleRename(name, newFileName.trim())}
-                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors"
+                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors duration-150"
                   >
                     Save
                   </button>
                   <button
                     onClick={() => setRenamingFile(null)}
-                    className="text-gray-500 hover:text-gray-700 px-3 py-1"
+                    className="text-gray-400 hover:text-gray-200 px-3 py-1 transition-colors duration-150"
                   >
                     Cancel
                   </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-800 truncate">{name}</span>
+                  <span className="font-medium text-gray-200 truncate">{name}</span>
                   <span
                     className={
                       file.uploaded
-                        ? "text-green-600 text-sm"
-                        : "text-yellow-600 text-sm"
+                        ? "text-green-500 text-sm"
+                        : "text-yellow-500 text-sm"
                     }
                   >
                     {file.uploaded ? "✅ Uploaded" : "⏳ Uploading"}
@@ -383,14 +390,14 @@ export default function Images() {
                     href={getPublicUrl(name)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    className="text-blue-500 hover:text-blue-400 text-sm font-medium"
                   >
                     🔍 Preview
                   </a>
                   <a
                     href={getPublicUrl(name)}
                     download={name}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    className="text-blue-500 hover:text-blue-400 text-sm font-medium"
                   >
                     ⬇️ Download
                   </a>
@@ -404,14 +411,14 @@ export default function Images() {
                       setRenamingFile(name);
                       setNewFileName(name);
                     }}
-                    className="text-yellow-600 hover:text-yellow-800"
+                    className="text-yellow-500 hover:text-yellow-400 transition-colors duration-150"
                     title="Rename image"
                   >
                     ✏️
                   </button>
                   <button
                     onClick={() => handleDelete(name)}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-red-500 hover:text-red-400 transition-colors duration-150"
                     title="Delete image"
                   >
                     ❌

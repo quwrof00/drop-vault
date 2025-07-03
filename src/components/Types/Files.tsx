@@ -25,48 +25,51 @@ export default function Files() {
   const progressIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   useEffect(() => {
-  if (user === undefined) return;
-  if (!user) {
-    navigate("/login");
-    return;
-  }
-
-  (async () => {
-    const FILES_KEY = getFilesKey(user.id);
-    const localFiles = (await get(FILES_KEY)) || {};
-
-    const { data: supabaseFiles, error } = await supabase.storage
-      .from("user-files")
-      .list(user.id);
-
-    if (error) {
-      console.error("Failed to fetch Supabase files", error);
-      setFiles(localFiles); // fallback
+    if (user === undefined) return;
+    if (!user) {
+      navigate("/login");
       return;
     }
 
-    const mergedFiles: { [key: string]: FileEntry } = { ...localFiles };
+    (async () => {
+      const FILES_KEY = getFilesKey(user.id);
+      const localFiles = (await get(FILES_KEY)) || {};
 
-    supabaseFiles?.forEach((file) => {
-      if (!mergedFiles[file.name]) {
-        mergedFiles[file.name] = {
-          name: file.name,
-          blob: new Blob(), 
-          uploaded: true,
-          lastModified: new Date(file.updated_at || file.created_at || Date.now()).getTime(),
-          progress: 100,
-        };
+      const { data: supabaseFiles, error } = await supabase.storage
+        .from("user-files")
+        .list(user.id);
+
+      if (error) {
+        console.error("Failed to fetch Supabase files", error);
+        setFiles(localFiles); // fallback
+        return;
       }
-    });
 
-    setFiles(mergedFiles);
-    await set(FILES_KEY, mergedFiles); // Update local cache
-  })();
-}, [user, navigate]);
+      const mergedFiles: { [key: string]: FileEntry } = { ...localFiles };
 
+      supabaseFiles?.forEach((file) => {
+        if (!mergedFiles[file.name]) {
+          mergedFiles[file.name] = {
+            name: file.name,
+            blob: new Blob(),
+            uploaded: true,
+            lastModified: new Date(file.updated_at || file.created_at || Date.now()).getTime(),
+            progress: 100,
+          };
+        }
+      });
+
+      setFiles(mergedFiles);
+      await set(FILES_KEY, mergedFiles); // Update local cache
+    })();
+  }, [user, navigate]);
 
   if (user === undefined) {
-    return <p className="text-center mt-10 text-gray-500 text-lg">Loading...</p>;
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-700">
+        <p className="text-gray-300 text-lg font-medium animate-pulse">Loading...</p>
+      </div>
+    );
   }
 
   const getIcon = (name: string) => {
@@ -130,16 +133,16 @@ export default function Files() {
       alert(`File with name ${fileName} already exists!`);
       return;
     }
-    const nameWithoutExtension = fileName.replace(/\.[^/.]+$/, '');
+    const nameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
 
-  // Allow only letters, numbers, underscores, hyphens, and spaces
-  const isValidName = /^[a-zA-Z0-9 _-]+$/.test(nameWithoutExtension);
+    // Allow only letters, numbers, underscores, hyphens, and spaces
+    const isValidName = /^[a-zA-Z0-9 _-]+$/.test(nameWithoutExtension);
 
-  if (!isValidName) {
-    alert('File name contains special characters. Only letters, numbers, spaces, _ and - are allowed.');
-    e.target.value = ''; 
-    return;
-  }
+    if (!isValidName) {
+      alert("File name contains special characters. Only letters, numbers, spaces, _ and - are allowed.");
+      e.target.value = "";
+      return;
+    }
 
     const newEntry: FileEntry = {
       name: file.name,
@@ -206,7 +209,7 @@ export default function Files() {
     const hasExtension = newExtIndex !== -1;
     const newName = hasExtension ? newNameInput : newNameInput + oldExt;
 
-    if (files[newName]){
+    if (files[newName]) {
       alert(`File with name ${newName} already exists!`);
       return;
     }
@@ -262,13 +265,13 @@ export default function Files() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-white rounded-lg shadow-sm">
+    <div className="p-6 space-y-6 bg-gray-700 rounded-lg shadow-md">
       <div className="flex flex-col sm:flex-row gap-4">
         <label className="flex-1">
           <input
             type="file"
             onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
+            className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition-colors"
           />
         </label>
         <input
@@ -276,19 +279,21 @@ export default function Files() {
           placeholder="Search files..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="flex-1 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 placeholder-gray-400"
+          className="flex-1 p-3 rounded-lg border border-gray-600 bg-gray-700 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ease-in-out"
         />
       </div>
 
       {filteredFiles.length === 0 && (
-        <p className="text-center text-gray-500">No files found. Upload some!</p>
+        <p className="text-center text-gray-400 text-sm font-medium">
+          No files found. Upload some!
+        </p>
       )}
 
       <ul className="space-y-4">
         {filteredFiles.map(([name, file]) => (
           <li
             key={name}
-            className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-md shadow-sm hover:shadow-md transition-shadow"
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
           >
             <div className="flex-1 flex items-center gap-3">
               <span className="text-lg">{getIcon(name)}</span>
@@ -297,7 +302,7 @@ export default function Files() {
                 <div className="flex items-center gap-3 w-full max-w-md">
                   <input
                     type="text"
-                    className="flex-1 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                    className="flex-1 p-2 rounded-md border border-gray-600 bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                     value={newFileName}
                     onChange={(e) => setNewFileName(e.target.value)}
                     onKeyDown={(e) => {
@@ -313,13 +318,13 @@ export default function Files() {
                   />
                   <button
                     onClick={() => handleRename(name, newFileName.trim())}
-                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors"
+                    className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors duration-150"
                   >
                     Save
                   </button>
                   <button
                     onClick={() => setRenamingFile(null)}
-                    className="text-gray-500 hover:text-gray-700 px-3 py-1"
+                    className="text-gray-400 hover:text-gray-200 px-3 py-1 transition-colors duration-150"
                   >
                     Cancel
                   </button>
@@ -330,15 +335,15 @@ export default function Files() {
                     href={getPublicUrl(name)}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-medium text-gray-800 hover:underline"
+                    className="font-medium text-gray-200 hover:underline"
                   >
                     {name}
                   </a>
                   <span
                     className={
                       file.uploaded
-                        ? "text-green-600 text-sm"
-                        : "text-yellow-600 text-sm"
+                        ? "text-green-500 text-sm"
+                        : "text-yellow-500 text-sm"
                     }
                   >
                     {file.uploaded ? "✅ Uploaded" : `⏳ ${file.progress}%`}
@@ -354,13 +359,13 @@ export default function Files() {
                     setRenamingFile(name);
                     setNewFileName(name.replace(/\.[^/.]+$/, ""));
                   }}
-                  className="text-blue-600 hover:text-blue-800 text-sm"
+                  className="text-blue-500 hover:text-blue-400 text-sm transition-colors duration-150"
                 >
                   ✏️
                 </button>
                 <button
                   onClick={() => handleDelete(name)}
-                  className="text-red-600 hover:text-red-800 text-sm"
+                  className="text-red-500 hover:text-red-400 text-sm transition-colors duration-150"
                 >
                   ❌
                 </button>

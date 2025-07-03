@@ -1,0 +1,89 @@
+
+.editor-wrapper {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  max-width: 100%;
+  margin: 1rem auto;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 0.5rem;
+  border-bottom: 1px solid #ddd;
+  background-color: #f9f9f9;
+}
+
+.toolbar button {
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.toolbar button:hover {
+  background-color: #e0e0e0;
+}
+
+.toolbar button.active {
+  background-color: #d0d0ff;
+}
+
+.editor-box {
+  padding: 2px;
+  min-height: 200px;
+}
+
+.ProseMirror:focus {
+  outline: none;
+}
+
+.ProseMirror h1 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+.ProseMirror li {
+  margin-bottom: 0.25rem;
+}
+
+.toolbar select {
+  border: 1px solid #ccc;
+  background: white;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+button[aria-label="Copy to clipboard"] {
+  transition: all 0.2s ease;
+}
+
+button[aria-label="Copy to clipboard"]:hover {
+  background: rgba(0,0,0,0.1);
+}
+
+.ProseMirror {
+  min-height: 200px;
+  padding: 1rem;
+  outline: none;
+}
