@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase-client";
 import { useAuthUser } from "../../hooks/useAuthUser";
 import { useNavigate } from "react-router-dom";
 import Editor from "../Editor";
+import { encrypt, decrypt } from "../../lib/crypto-helper";
 
 const getNotesKey = (userId: string) => `my_notes_files_${userId}`;
 
@@ -16,42 +17,56 @@ export default function Notes() {
   const [search, setSearch] = useState<string>("");
 
   useEffect(() => {
-    if (user === undefined) return;
-    if (!user) {
-      navigate("/login");
-      return;
-    }
+  if (user === undefined) return;
+  if (!user) {
+    navigate("/login");
+    return;
+  }
 
-    (async () => {
-      const NOTES_KEY = getNotesKey(user.id);
-      const localNotes = (await get(NOTES_KEY)) || {};
-      setFiles(localNotes);
+  (async () => {
+    const NOTES_KEY = getNotesKey(user.id);
+    const localNotes = (await get(NOTES_KEY)) || {};
+    setFiles(localNotes); // still load local cache for speed
 
-      const { data: supabaseData, error } = await supabase
-        .from("notes")
-        .select("title, content")
-        .eq("user_id", user.id);
+    const { data: supabaseData, error } = await supabase
+      .from("notes")
+      .select("title, ciphertext, iv, salt")
+      .eq("user_id", user.id);
 
-      if (supabaseData && !error) {
-        const supabaseNotes: { [key: string]: string } = {};
-        supabaseData.forEach(({ title, content }) => {
-          supabaseNotes[title] = content;
-        });
+    const secretKey = user.id; // 🔐 replace with vault password later
 
-        const merged = { ...supabaseNotes, ...localNotes };
-        setFiles(merged);
-        await set(NOTES_KEY, merged);
+    if (supabaseData && !error) {
+      const supabaseNotes: { [key: string]: string } = {};
 
-        if (!currentFile || !merged[currentFile]) {
-          const firstFile = Object.keys(merged)[0];
-          if (firstFile) {
-            setCurrentFile(firstFile);
-            setText(merged[firstFile]);
+      for (const note of supabaseData) {
+        const { title, ciphertext, iv, salt } = note;
+        try {
+          if (ciphertext && iv && salt) {
+            const content = await decrypt({ ciphertext, iv, salt }, secretKey);
+            supabaseNotes[title] = content;
+          } else {
+            supabaseNotes[title] = ""; // fallback for old empty or broken notes
           }
+        } catch (err) {
+          console.error(`Failed to decrypt note "${title}":`, err);
+          supabaseNotes[title] = "[Decryption failed]";
         }
       }
-    })();
-  }, [user, navigate]);
+
+      const merged = { ...supabaseNotes, ...localNotes }; // 🧠 prefer Supabase first
+      setFiles(merged);
+      await set(NOTES_KEY, merged);
+
+      if (!currentFile || !merged[currentFile]) {
+        const firstFile = Object.keys(merged)[0];
+        if (firstFile) {
+          setCurrentFile(firstFile);
+          setText(merged[firstFile]);
+        }
+      }
+    }
+  })();
+}, [user, navigate]);
 
   useEffect(() => {
     if (!currentFile || !user) return;
@@ -62,6 +77,9 @@ export default function Notes() {
       setFiles(updated);
       await set(NOTES_KEY, updated);
 
+      const secretKey = user.id; // later: vault password or derived
+      const encrypted = await encrypt(text, secretKey);
+
       const { error } = await supabase
         .from("notes")
         .upsert(
@@ -69,6 +87,9 @@ export default function Notes() {
             user_id: user.id,
             title: currentFile,
             content: text,
+            ciphertext: encrypted.ciphertext,
+            iv: encrypted.iv,
+            salt: encrypted.salt,
           },
           {
             onConflict: "user_id,title",
@@ -96,6 +117,7 @@ export default function Notes() {
 
   const handleNewFile = async () => {
     if (!user) return;
+    
     const name = prompt("Enter a name for your note:");
     if (!name) return;
     if (files[name]) {
@@ -114,6 +136,7 @@ export default function Notes() {
       user_id: user.id,
       title: name,
       content: "",
+      
     });
   };
 
