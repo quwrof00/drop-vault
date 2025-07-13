@@ -86,7 +86,6 @@ export default function Notes() {
           {
             user_id: user.id,
             title: currentFile,
-            content: text,
             ciphertext: encrypted.ciphertext,
             iv: encrypted.iv,
             salt: encrypted.salt,
