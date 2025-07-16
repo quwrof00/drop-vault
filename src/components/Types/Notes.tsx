@@ -214,7 +214,7 @@ export default function Notes() {
       </h2>
 
       {currentFile ? (
-        <div className="h-[calc(100%-3.5rem)] bg-gray-800 border border-gray-600 rounded-lg shadow-sm p-3 sm:p-4">
+        <div className="flex-1 bg-gray-800 border border-gray-600 rounded-lg shadow-sm p-3 sm:p-4">
           <Editor content={text} onUpdate={setText} key={currentFile} />
         </div>
       ) : (
