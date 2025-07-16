@@ -193,7 +193,7 @@ export default function Notes() {
     .sort((a, b) => a.localeCompare(b));
 
   return (
-  <div className="flex flex-row min-h-[calc(100vh-4rem)] bg-gray-700 rounded-lg shadow-md overflow-hidden transition-all duration-300">
+  <div className="flex flex-row min-h-[calc(100vh-4rem)] h-full bg-gray-700 rounded-lg shadow-md overflow-hidden transition-all duration-300">
     {/* Collapsible Sidebar */}
     <SubSidebar
       search={search}
