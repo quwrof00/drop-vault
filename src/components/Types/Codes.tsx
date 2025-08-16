@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { get, set } from "idb-keyval";
 import { useAuthUser } from "../../hooks/useAuthUser";
 import { supabase } from "../../lib/supabase-client";
-import Compiler from "../Compiler";
-import CodeEditor from "@uiw/react-textarea-code-editor";
 import SubSidebar from "../SubSidebar";
-
-const getSnippetsKey = (userId: string) => `my_code_snippets_${userId}`;
+import CodeEditor from "@uiw/react-textarea-code-editor";
+import Compiler from "../Compiler";
 
 const languages = [
   { label: "C", value: "c" },
@@ -22,13 +19,19 @@ type Snippet = {
   language: string;
 };
 
-export default function Codes() {
+type CodesProps = {
+  roomId?: string | null;
+};
+
+export default function Codes({ roomId }: CodesProps) {
   const user = useAuthUser();
   const navigate = useNavigate();
-  const [snippets, setSnippets] = useState<{ [title: string]: Snippet }>({});
-  const [currentTitle, setCurrentTitle] = useState("");
-  const [search, setSearch] = useState("");
+  const [snippets, setSnippets] = useState<{ [key: string]: Snippet }>({});
+  const [currentTitle, setCurrentTitle] = useState<string>("");
+  const [search, setSearch] = useState<string>("");
+  const [code, setCode] = useState<string>("");
 
+  // Fetch snippets from Supabase
   useEffect(() => {
     if (user === undefined) return;
     if (!user) {
@@ -37,47 +40,50 @@ export default function Codes() {
     }
 
     (async () => {
-      const SNIPPETS_KEY = getSnippetsKey(user.id);
-      const localSnippets = (await get(SNIPPETS_KEY)) || {};
+      let query = supabase
+      .from("codes")
+      .select("title, code, language")
+      .eq("user_id", user.id);
+      if (roomId) {
+        query = query.eq("room_id", roomId);
+      } else {
+        query = query.is("room_id", null);
+      }
+      
+      const { data: supabaseData, error } = await query;
 
-      const { data, error } = await supabase
-        .from("codes")
-        .select("title, code, language")
-        .eq("user_id", user.id);
-
-      if (data && !error) {
+      if (supabaseData && !error) {
         const supabaseSnippets: { [key: string]: Snippet } = {};
-        data.forEach(({ title, code, language }) => {
+        for (const { title, code, language } of supabaseData) {
           supabaseSnippets[title] = {
             code: code || "",
             language: language || "javascript",
           };
-        });
+        }
 
-        const merged = { ...supabaseSnippets, ...localSnippets };
-        setSnippets(merged);
-        await set(SNIPPETS_KEY, merged);
+        setSnippets(supabaseSnippets);
 
-        if (!currentTitle || !merged[currentTitle]) {
-          const firstTitle = Object.keys(merged)[0];
+        if (!currentTitle || !supabaseSnippets[currentTitle]) {
+          const firstTitle = Object.keys(supabaseSnippets)[0];
           if (firstTitle) {
             setCurrentTitle(firstTitle);
+            setCode(supabaseSnippets[firstTitle].code);
           }
         }
+      } else {
+        console.error("Failed to fetch Supabase snippets", error);
+        setSnippets({});
       }
     })();
-  }, [user, navigate]);
+  }, [user, navigate, roomId]);
 
+  // Sync updates to Supabase
   useEffect(() => {
     if (!currentTitle || !user) return;
 
     const timeout = setTimeout(async () => {
-      const SNIPPETS_KEY = getSnippetsKey(user.id);
-      const updated = { ...snippets };
-      await set(SNIPPETS_KEY, updated);
-
-      const snippetToSave = updated[currentTitle];
-      if (!snippetToSave) return;
+      const snippet = snippets[currentTitle];
+      if (!snippet) return;
 
       const { error } = await supabase
         .from("codes")
@@ -85,157 +91,151 @@ export default function Codes() {
           {
             user_id: user.id,
             title: currentTitle,
-            code: snippetToSave.code,
-            language: snippetToSave.language,
+            code: code,
+            language: snippet.language,
+            room_id: roomId ?? null,
           },
-          { onConflict: "user_id,title" }
+          {
+            onConflict: roomId ? "user_id,title,room_id" : "user_id,title",
+          }
         );
 
       if (error) console.error("Sync failed:", error.message);
+
+      setSnippets((prev) => ({
+        ...prev,
+        [currentTitle]: { ...prev[currentTitle], code },
+      }));
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [snippets, currentTitle, user]);
+  }, [code, currentTitle, user, roomId, snippets]);
+
+  if (user === undefined) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] bg-gray-700">
+        <p className="text-gray-300 text-base sm:text-lg font-medium animate-pulse">
+          Loading...
+        </p>
+      </div>
+    );
+  }
+
+  const handleSelect = (title: string) => {
+    setCurrentTitle(title);
+    setCode(snippets[title].code);
+  };
 
   const handleNewSnippet = async () => {
     if (!user) return;
-    const title = prompt("Enter a title for your snippet:");
-    if (!title || snippets[title]) return;
 
-    const updated = {
-      ...snippets,
-      [title]: { code: "", language: "javascript" },
-    };
-    setSnippets(updated);
+    const title = prompt("Enter a name for your snippet:");
+    if (!title) return;
+    if (snippets[title]) {
+      alert(`Snippet with title ${title} already exists!`);
+      return;
+    }
+
+    const newSnippet = { code: "", language: "javascript" };
+    setSnippets((prev) => ({ ...prev, [title]: newSnippet }));
     setCurrentTitle(title);
+    setCode("");
 
-    const SNIPPETS_KEY = getSnippetsKey(user.id);
-    await set(SNIPPETS_KEY, updated);
-
-    const { error } = await supabase.from("codes").insert({
+    await supabase.from("codes").insert({
       user_id: user.id,
       title,
       code: "",
       language: "javascript",
+      room_id: roomId ?? null,
     });
-    if (error) console.error("Failed to insert new snippet:", error.message);
-  };
-
-  const handleSelect = (title: string) => {
-    setCurrentTitle(title);
   };
 
   const handleDelete = async (title: string) => {
-  if (!user || !confirm(`Delete "${title}"?`)) return;
+    if (!user || !confirm(`Delete "${title}"?`)) return;
 
-  // Create updated snippets object
-  const updated = { ...snippets };
-  delete updated[title];
-
-  // Optimistic UI update
-  setSnippets(updated);
-  if (title === currentTitle) {
-    setCurrentTitle(Object.keys(updated)[0] || "");
-  }
-
-  try {
-    // Update IndexedDB
-    await set(getSnippetsKey(user.id), updated);
-    
-    // Update Supabase
-    const { error } = await supabase
+    const deleteQuery = supabase
       .from("codes")
       .delete()
       .eq("user_id", user.id)
       .eq("title", title);
 
-    if (error) throw error;
-  } catch (error) {
-    console.error("Delete failed:", error);
-    // Revert on error
-    setSnippets(snippets);
-    if (currentTitle === "") {
-      setCurrentTitle(title);
+    if (roomId) {
+      deleteQuery.eq("room_id", roomId);
+    } else {
+      deleteQuery.is("room_id", null);
     }
-  }
-};
+
+    const { error } = await deleteQuery;
+
+    if (error) {
+      alert(`Failed to delete snippet "${title}": ${error.message}`);
+      return;
+    }
+
+    const updated = { ...snippets };
+    delete updated[title];
+    setSnippets(updated);
+
+    if (title === currentTitle) {
+      const next = Object.keys(updated)[0] || "";
+      setCurrentTitle(next);
+      setCode(updated[next]?.code || "");
+    }
+  };
 
   const handleRename = async (title: string) => {
-  if (!user || !title || !snippets[title]) return;
+    if (!user) return;
 
-  const newTitle = prompt("Enter new title:", title);
-  if (!newTitle || newTitle === title) return;
-  
-  if (snippets[newTitle]) {
-    alert(`Snippet with title "${newTitle}" already exists!`);
-    return;
-  }
+    const newTitle = prompt("Enter new title:", title);
+    if (!newTitle || newTitle === title) return;
+    if (snippets[newTitle]) {
+      alert(`Snippet with title ${newTitle} already exists!`);
+      return;
+    }
 
-  // Create updated snippets object
-  const updated = { ...snippets };
-  updated[newTitle] = updated[title];
-  delete updated[title];
-
-  // Optimistic UI update
-  setSnippets(updated);
-  if (currentTitle === title) {
-    setCurrentTitle(newTitle);
-  }
-
-  try {
-    // Update IndexedDB
-    await set(getSnippetsKey(user.id), updated);
-    
-    // Update Supabase
-    const { error } = await supabase
+    const updateQuery = supabase
       .from("codes")
       .update({ title: newTitle })
       .eq("user_id", user.id)
       .eq("title", title);
 
-    if (error) throw error;
-  } catch (error) {
-    console.error("Rename failed:", error);
-    // Revert on error
-    setSnippets(snippets);
-    if (currentTitle === newTitle) {
-      setCurrentTitle(title);
+    if (roomId) {
+      updateQuery.eq("room_id", roomId);
+    } else {
+      updateQuery.is("room_id", null);
     }
-  }
-};
 
-useEffect(() => {
-  if (currentTitle && !snippets[currentTitle]) {
-    setCurrentTitle(Object.keys(snippets)[0] || "");
-  }
-}, [snippets, currentTitle]);
+    const { error } = await updateQuery;
+
+    if (error) {
+      alert(`Failed to rename snippet "${title}": ${error.message}`);
+      return;
+    }
+
+    setSnippets((prev) => {
+      const updated: { [key: string]: Snippet } = {};
+      Object.keys(prev).forEach((key) => {
+        updated[key === title ? newTitle : key] = prev[key];
+      });
+      return updated;
+    });
+
+    if (title === currentTitle) setCurrentTitle(newTitle);
+  };
 
   const handleLanguageChange = (language: string) => {
     if (!currentTitle) return;
-    setSnippets({
-      ...snippets,
+    setSnippets((prev) => ({
+      ...prev,
       [currentTitle]: {
-        ...snippets[currentTitle],
+        ...prev[currentTitle],
         language,
       },
-    });
+    }));
   };
 
-  const handleCodeChange = async (title: string, code: string) => {
-    if (!currentTitle) return;
-    setSnippets({
-      ...snippets,
-      [currentTitle]: {
-        ...snippets[currentTitle],
-        code,
-      },
-    });
-    const { error: codeChangeError } = await supabase
-      .from("codes")
-      .update({ code: code })
-      .eq("user_id", user?.id)
-      .eq("title", title);
-    if (codeChangeError) console.log("Error while editing code: ", codeChangeError);
+  const handleCodeChange = (code: string) => {
+    setCode(code);
   };
 
   const filteredSnippets = Object.keys(snippets)
@@ -243,74 +243,72 @@ useEffect(() => {
     .sort((a, b) => a.localeCompare(b));
 
   return (
-  <div className="flex h-[calc(100vh-4rem)] bg-gray-700 rounded-lg shadow-md overflow-hidden transition-all duration-300">
-    {/* Collapsible Sidebar */}
-    <SubSidebar
-      search={search}
-      setSearch={setSearch}
-      items={filteredSnippets}
-      onCreate={handleNewSnippet}
-      onSelect={handleSelect}
-      onRename={handleRename}
-      onDelete={handleDelete}
-      currentItem={currentTitle}
-      typeLabel="Snippet"
-    />
+    <div className="flex h-[calc(100vh-4rem)] bg-gray-700 rounded-lg shadow-md overflow-hidden transition-all duration-300">
+      {/* Collapsible Sidebar */}
+      <SubSidebar
+        search={search}
+        setSearch={setSearch}
+        items={filteredSnippets}
+        onCreate={handleNewSnippet}
+        onSelect={handleSelect}
+        onRename={handleRename}
+        onDelete={handleDelete}
+        currentItem={currentTitle}
+        typeLabel="Snippet"
+      />
 
-    {/* Editor Area */}
-    <div className="flex-1 p-6 lg:p-8 overflow-auto bg-gray-700 transition-all duration-300">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-200 truncate">
-          {currentTitle || "No Snippet Selected"}
-        </h2>
-        <select
-          className="p-2 rounded-lg border border-gray-600 bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ease-in-out"
-          disabled={!currentTitle}
-          value={currentTitle ? snippets[currentTitle]?.language : "javascript"}
-          onChange={(e) => handleLanguageChange(e.target.value)}
-        >
-          {languages.map(({ label, value }) => (
-            <option key={value} value={value} className="bg-gray-700 text-gray-200">
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {currentTitle ? (
-        <div className="flex flex-col gap-4">
-          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-sm">
-            <CodeEditor
-              language={snippets[currentTitle]?.language || "javascript"}
-              value={snippets[currentTitle]?.code || ""}
-              onChange={(e) => handleCodeChange(currentTitle, e.target.value)}
-              padding={15}
-              style={{
-                fontSize: 14,
-                backgroundColor: "#1f2937",
-                color: "#e5e7eb",
-                fontFamily:
-                  "ui-monospace, SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace",
-                borderRadius: "6px",
-                border: "1px solid #4b5563",
-                minHeight: "300px",
-                flex: 1,
-              }}
-            />
-          </div>
-          <div className="bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-600">
-            <Compiler
-              language={snippets[currentTitle]?.language || "javascript"}
-              code={snippets[currentTitle]?.code || ""}
-            />
-          </div>
+      {/* Editor Area */}
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto bg-gray-700 transition-all duration-300">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-200 truncate">
+            {currentTitle || "No Snippet Selected"}
+          </h2>
+          <select
+            disabled={!currentTitle}
+            value={currentTitle ? snippets[currentTitle]?.language : "javascript"}
+            onChange={(e) => handleLanguageChange(e.target.value)}
+            className="p-2 rounded-lg border border-gray-600 bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {languages.map(({ label, value }) => (
+              <option key={value} value={value} className="bg-gray-700 text-gray-200">
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
-      ) : (
-        <p className="text-gray-400 italic text-base text-center mt-10">
-          Select or create a snippet to start coding.
-        </p>
-      )}
+
+        {currentTitle ? (
+          <div className="flex flex-col gap-4">
+            <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-sm">
+              <CodeEditor
+                language={snippets[currentTitle].language}
+                value={code}
+                onChange={(e) => handleCodeChange(e.target.value)}
+                padding={15}
+                style={{
+                  fontSize: 14,
+                  backgroundColor: "#1f2937",
+                  color: "#e5e7eb",
+                  fontFamily: "ui-monospace, SFMono-Regular, Consolas, Menlo, monospace",
+                  borderRadius: "6px",
+                  border: "1px solid #4b5563",
+                  minHeight: "300px",
+                }}
+              />
+            </div>
+            <div className="bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-600">
+              <Compiler
+                language={snippets[currentTitle].language}
+                code={code}
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="text-gray-400 italic text-sm sm:text-base text-center mt-10">
+            Select or create a snippet to start coding.
+          </p>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
 }

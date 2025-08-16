@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { get, set } from "idb-keyval";
 import { supabase } from "../../lib/supabase-client";
 import { useAuthUser } from "../../hooks/useAuthUser";
 import { useNavigate } from "react-router-dom";
@@ -7,9 +6,13 @@ import Editor from "../Editor";
 import { encrypt, decrypt } from "../../lib/crypto-helper";
 import SubSidebar from "../SubSidebar";
 
-const getNotesKey = (userId: string) => `my_notes_files_${userId}`;
+type NotesProps = {
+  roomId?: string | null;
+};
 
-export default function Notes() {
+export default function Notes({ roomId }: NotesProps) {
+  console.log("Room Id Notes: ", roomId);
+  
   const user = useAuthUser();
   const navigate = useNavigate();
   const [files, setFiles] = useState<{ [key: string]: string }>({});
@@ -17,68 +20,79 @@ export default function Notes() {
   const [text, setText] = useState<string>("");
   const [search, setSearch] = useState<string>("");
 
-  useEffect(() => {
-    if (user === undefined) return;
-    if (!user) {
-      navigate("/login");
+  // Fetch notes
+ useEffect(() => {
+  if (user === undefined) return;
+  if (!user) {
+    navigate("/login");
+    return;
+  }
+
+  (async () => {
+    const secretKey = roomId ?? user.id;
+
+    // CHANGED: avoid `.or(...)` because it returns notes outside the intended scope.
+    // Instead, explicitly AND the conditions.
+    let query = supabase
+      .from("notes")
+      .select("title, ciphertext, iv, salt");
+
+    if (roomId) {
+      // Only notes for this room
+      query = query.eq("room_id", roomId);
+    } else {
+      // Only personal notes: owned by user AND room_id IS NULL
+      query = query.eq("user_id", user.id).is("room_id", null);
+    }
+
+    const { data: supabaseData, error } = await query;
+
+    if (error) {
+      console.error("Failed to fetch Supabase notes", error);
+      setFiles({});
       return;
     }
 
-    (async () => {
-      const NOTES_KEY = getNotesKey(user.id);
-      const localNotes = (await get(NOTES_KEY)) || {};
-      setFiles(localNotes);
+    const supabaseNotes: { [key: string]: string } = {};
+    for (const note of supabaseData ?? []) {
+      const { title, ciphertext, iv, salt } = note as {
+        title: string;
+        ciphertext: string | null;
+        iv: string | null;
+        salt: string | null;
+      };
 
-      const { data: supabaseData, error } = await supabase
-        .from("notes")
-        .select("title, ciphertext, iv, salt")
-        .eq("user_id", user.id);
-
-      const secretKey = user.id;
-
-      if (supabaseData && !error) {
-        const supabaseNotes: { [key: string]: string } = {};
-
-        for (const note of supabaseData) {
-          const { title, ciphertext, iv, salt } = note;
-          try {
-            if (ciphertext && iv && salt) {
-              const content = await decrypt({ ciphertext, iv, salt }, secretKey);
-              supabaseNotes[title] = content;
-            } else {
-              supabaseNotes[title] = "";
-            }
-          } catch (err) {
-            console.error(`Failed to decrypt note "${title}":`, err);
-            supabaseNotes[title] = "[Decryption failed]";
-          }
+      try {
+        if (ciphertext && iv && salt) {
+          const content = await decrypt({ ciphertext, iv, salt }, secretKey);
+          supabaseNotes[title] = content;
+        } else {
+          supabaseNotes[title] = "";
         }
-
-        const merged = { ...supabaseNotes, ...localNotes };
-        setFiles(merged);
-        await set(NOTES_KEY, merged);
-
-        if (!currentFile || !merged[currentFile]) {
-          const firstFile = Object.keys(merged)[0];
-          if (firstFile) {
-            setCurrentFile(firstFile);
-            setText(merged[firstFile]);
-          }
-        }
+      } catch (err) {
+        console.error(`Failed to decrypt note "${title}":`, err);
+        supabaseNotes[title] = "[Decryption failed]";
       }
-    })();
-  }, [user, navigate]);
+    }
+
+    setFiles(supabaseNotes);
+
+    if (!currentFile || !(currentFile in supabaseNotes)) {
+      const firstFile = Object.keys(supabaseNotes)[0];
+      if (firstFile) {
+        setCurrentFile(firstFile);
+        setText(supabaseNotes[firstFile]);
+      }
+    }
+  })();
+}, [user, navigate, roomId]);
 
   useEffect(() => {
     if (!currentFile || !user) return;
 
     const timeout = setTimeout(async () => {
-      const NOTES_KEY = getNotesKey(user.id);
-      const updated = { ...files, [currentFile]: text };
-      setFiles(updated);
-      await set(NOTES_KEY, updated);
+      const secretKey = roomId ?? user.id;
 
-      const secretKey = user.id;
       const encrypted = await encrypt(text, secretKey);
 
       const { error } = await supabase
@@ -90,9 +104,10 @@ export default function Notes() {
             ciphertext: encrypted.ciphertext,
             iv: encrypted.iv,
             salt: encrypted.salt,
+            room_id: roomId ?? null,
           },
           {
-            onConflict: "user_id,title",
+            onConflict: roomId ? "user_id,title,room_id" : "user_id,title",
           }
         );
 
@@ -100,7 +115,7 @@ export default function Notes() {
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [text, currentFile, user]);
+  }, [text, currentFile, user, roomId]);
 
   if (user === undefined) {
     return (
@@ -125,34 +140,44 @@ export default function Notes() {
       return;
     }
 
-    const NOTES_KEY = getNotesKey(user.id);
-    const updated = { ...files, [name]: "" };
-    setFiles(updated);
+    setFiles((prev) => ({ ...prev, [name]: "" }));
     setCurrentFile(name);
     setText("");
-    await set(NOTES_KEY, updated);
 
     await supabase.from("notes").insert({
       user_id: user.id,
       title: name,
       content: "",
+      room_id: roomId ?? null,
     });
   };
 
   const handleDelete = async (file: string) => {
     if (!user || !confirm(`Delete "${file}"?`)) return;
 
-    const NOTES_KEY = getNotesKey(user.id);
-    const updated = { ...files };
-    delete updated[file];
-    setFiles(updated);
-    await set(NOTES_KEY, updated);
-
-    await supabase
+    const deleteQuery = supabase
       .from("notes")
       .delete()
       .eq("user_id", user.id)
       .eq("title", file);
+    
+    if (roomId) {
+      deleteQuery.eq("room_id", roomId); // delete room note only
+    } else {
+      deleteQuery.is("room_id", null); // delete personal vault note only
+    }
+    
+    const { error } = await deleteQuery;
+
+    if (error) {
+      alert(`Failed to delete note "${file}": ${error.message}`);
+      return;
+    }
+
+    const updated = { ...files };
+    delete updated[file];
+
+    setFiles(updated);
 
     if (file === currentFile) {
       const next = Object.keys(updated)[0] || "";
@@ -170,20 +195,32 @@ export default function Notes() {
       return;
     }
 
-    const NOTES_KEY = getNotesKey(user.id);
-    const updated: { [key: string]: string } = {};
-    Object.keys(files).forEach((key) => {
-      updated[key === file ? newName : key] = files[key];
-    });
-
-    setFiles(updated);
-    await set(NOTES_KEY, updated);
-
-    await supabase
+    const updateQuery = supabase
       .from("notes")
       .update({ title: newName })
       .eq("user_id", user.id)
-      .eq("title", file);
+      .eq("title", file); 
+
+    if (roomId) {
+      updateQuery.eq("room_id", roomId);
+    } else {
+      updateQuery.is("room_id", null); 
+    }
+
+    const { error } = await updateQuery;
+
+    if (error) {
+      alert(`Failed to rename note "${file}": ${error.message}`);
+      return;
+    }
+
+    setFiles((prev) => {
+      const updated: { [key: string]: string } = {};
+      Object.keys(prev).forEach((key) => {
+        updated[key === file ? newName : key] = prev[key];
+      });
+      return updated;
+    });
 
     if (file === currentFile) setCurrentFile(newName);
   };
@@ -193,37 +230,36 @@ export default function Notes() {
     .sort((a, b) => a.localeCompare(b));
 
   return (
-  <div className="flex h-[calc(100vh-4rem)] bg-gray-700 rounded-lg shadow-md overflow-hidden transition-all duration-300">
-    {/* Collapsible Sidebar */}
-    <SubSidebar
-      search={search}
-      setSearch={setSearch}
-      items={filteredFiles}
-      onCreate={handleNewFile}
-      onSelect={handleFileSelect}
-      onRename={handleRename}
-      onDelete={handleDelete}
-      currentItem={currentFile}
-      typeLabel="Note"
-    />
+    <div className="flex h-[calc(100vh-4rem)] bg-gray-700 rounded-lg shadow-md overflow-hidden transition-all duration-300">
+      {/* Collapsible Sidebar */}
+      <SubSidebar
+        search={search}
+        setSearch={setSearch}
+        items={filteredFiles}
+        onCreate={handleNewFile}
+        onSelect={handleFileSelect}
+        onRename={handleRename}
+        onDelete={handleDelete}
+        currentItem={currentFile}
+        typeLabel="Note"
+      />
 
-    {/* Editor Area */}
-    <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto bg-gray-700 transition-all duration-300">
-      <h2 className="text-xl sm:text-2xl font-semibold text-gray-200 mb-4 sm:mb-6">
-        {currentFile || "No Note Selected"}
-      </h2>
+      {/* Editor Area */}
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto bg-gray-700 transition-all duration-300">
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-200 mb-4 sm:mb-6">
+          {currentFile || "No Note Selected"}
+        </h2>
 
-      {currentFile ? (
-        <div className="flex-1 bg-gray-800 border border-gray-600 rounded-lg shadow-sm p-3 sm:p-4">
-          <Editor content={text} onUpdate={setText} key={currentFile} />
-        </div>
-      ) : (
-        <p className="text-gray-400 italic text-sm sm:text-base">
-          Select or create a note to begin editing.
-        </p>
-      )}
+        {currentFile ? (
+          <div className="flex-1 bg-gray-800 border border-gray-600 rounded-lg shadow-sm p-3 sm:p-4">
+            <Editor content={text} onUpdate={setText} key={currentFile} />
+          </div>
+        ) : (
+          <p className="text-gray-400 italic text-sm sm:text-base">
+            Select or create a note to begin editing.
+          </p>
+        )}
+      </div>
     </div>
-</div>
-);
-
+  );
 }

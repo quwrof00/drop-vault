@@ -1,10 +1,7 @@
-import { get, set } from "idb-keyval";
 import { supabase } from "../../lib/supabase-client";
 import { useAuthUser } from "../../hooks/useAuthUser";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-
-const getFilesKey = (userId: string) => `my_files_${userId}`;
 
 type FileEntry = {
   name: string;
@@ -14,7 +11,11 @@ type FileEntry = {
   progress: number;
 };
 
-export default function Files() {
+type FilesProps = {
+  roomId?: string | null;
+};
+
+export default function Files({ roomId }: FilesProps) {
   const user = useAuthUser();
   const navigate = useNavigate();
   const [files, setFiles] = useState<{ [key: string]: FileEntry }>({});
@@ -32,42 +33,38 @@ export default function Files() {
     }
 
     (async () => {
-      const FILES_KEY = getFilesKey(user.id);
-      const localFiles = (await get(FILES_KEY)) || {};
-
+      const folderPath = roomId ? `room-${roomId}` : user.id;
+      
       const { data: supabaseFiles, error } = await supabase.storage
         .from("user-files")
-        .list(user.id);
+        .list(folderPath);
 
       if (error) {
         console.error("Failed to fetch Supabase files", error);
-        setFiles(localFiles); // fallback
+        setFiles({}); // Clear files on error
         return;
       }
 
-      const mergedFiles: { [key: string]: FileEntry } = { ...localFiles };
+      const mergedFiles: { [key: string]: FileEntry } = {};
 
       supabaseFiles?.forEach((file) => {
-        if (!mergedFiles[file.name]) {
-          mergedFiles[file.name] = {
-            name: file.name,
-            blob: new Blob(),
-            uploaded: true,
-            lastModified: new Date(file.updated_at || file.created_at || Date.now()).getTime(),
-            progress: 100,
-          };
-        }
+        mergedFiles[file.name] = {
+          name: file.name,
+          blob: new Blob(),
+          uploaded: true,
+          lastModified: new Date(file.updated_at || file.created_at || Date.now()).getTime(),
+          progress: 100,
+        };
       });
 
       setFiles(mergedFiles);
-      await set(FILES_KEY, mergedFiles); // Update local cache
     })();
-  }, [user, navigate]);
+  }, [user, navigate, roomId]);
 
   if (user === undefined) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-700">
-        <p className="text-gray-300 text-lg font-medium animate-pulse">Loading...</p>
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] bg-gray-700">
+        <p className="text-gray-300 text-base sm:text-lg font-medium animate-pulse">Loading...</p>
       </div>
     );
   }
@@ -84,17 +81,18 @@ export default function Files() {
   };
 
   const getPublicUrl = (fileName: string) => {
+    if (!user) return;
+    const folderPath = roomId ? `room-${roomId}` : user.id;
     const { data } = supabase.storage
       .from("user-files")
-      .getPublicUrl(`${user?.id}/${fileName}`);
+      .getPublicUrl(`${folderPath}/${fileName}`);
     return data.publicUrl;
   };
 
   const uploadToSupabase = async (fileEntry: FileEntry) => {
     if (!user) return;
-    const cleanedFileName = fileEntry.name.replace(/\[|\]/g, "");
-    fileEntry.name = cleanedFileName;
-    const path = `${user.id}/${fileEntry.name}`;
+    const folderPath = roomId ? `room-${roomId}` : user.id;
+    const path = `${folderPath}/${fileEntry.name}`;
 
     try {
       const { error } = await supabase.storage
@@ -106,14 +104,10 @@ export default function Files() {
         return;
       }
 
-      setFiles((prev) => {
-        const updated = {
-          ...prev,
-          [fileEntry.name]: { ...fileEntry, uploaded: true, progress: 100 },
-        };
-        void set(getFilesKey(user.id), updated);
-        return updated;
-      });
+      setFiles((prev) => ({
+        ...prev,
+        [fileEntry.name]: { ...fileEntry, uploaded: true, progress: 100 },
+      }));
     } catch (err) {
       alert(`Failed to upload ${fileEntry.name}`);
     } finally {
@@ -152,13 +146,10 @@ export default function Files() {
       progress: 0,
     };
 
-    const updated = {
-      ...files,
+    setFiles((prev) => ({
+      ...prev,
       [file.name]: newEntry,
-    };
-
-    setFiles(updated);
-    await set(getFilesKey(user.id), updated);
+    }));
 
     let progress = 0;
     progressIntervals.current[file.name] = setInterval(() => {
@@ -178,23 +169,22 @@ export default function Files() {
   const handleDelete = async (fileName: string) => {
     if (!user || !confirm(`Delete "${fileName}"?`)) return;
 
-    const updated = { ...files };
-    delete updated[fileName];
-    setFiles(updated);
-    await set(getFilesKey(user.id), updated);
-
+    const folderPath = roomId ? `room-${roomId}` : user.id;
     const { error } = await supabase.storage
       .from("user-files")
-      .remove([`${user.id}/${fileName}`]);
+      .remove([`${folderPath}/${fileName}`]);
 
     if (error) {
       alert(`Failed to delete file "${fileName}": ${error.message}`);
+      return;
     }
-  };
 
-  const filteredFiles = Object.entries(files)
-    .filter(([name]) => name.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort(([, a], [, b]) => b.lastModified - a.lastModified);
+    setFiles((prev) => {
+      const updated = { ...prev };
+      delete updated[fileName];
+      return updated;
+    });
+  };
 
   const handleRename = async (oldName: string, newNameInput: string) => {
     if (!user) return;
@@ -214,13 +204,9 @@ export default function Files() {
       return;
     }
 
-    if (newName === oldName) {
-      setRenamingFile(null);
-      return;
-    }
-
-    const oldPath = `${user.id}/${oldName}`;
-    const newPath = `${user.id}/${newName}`;
+    const folderPath = roomId ? `room-${roomId}` : user.id;
+    const oldPath = `${folderPath}/${oldName}`;
+    const newPath = `${folderPath}/${newName}`;
 
     const { data: downloadData, error: downloadError } = await supabase.storage
       .from("user-files")
@@ -257,12 +243,15 @@ export default function Files() {
         ...entry,
         name: newName,
       };
-      set(getFilesKey(user.id), updatedFiles);
       return updatedFiles;
     });
 
     setRenamingFile(null);
   };
+
+  const filteredFiles = Object.entries(files)
+    .filter(([name]) => name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort(([, a], [, b]) => b.lastModified - a.lastModified);
 
   return (
     <div className="p-6 space-y-6 bg-gray-700 rounded-lg shadow-md">

@@ -1,4 +1,9 @@
-const Sidebar = ({ onSelect, activeSection }: { onSelect: (section: string) => void; activeSection?: string }) => {
+type SidebarProps = {
+  onSelect: (section: string) => void;
+  activeSection?: string
+};
+
+const Sidebar = ({ onSelect, activeSection }: SidebarProps) => {
   const sections = [
     { name: "Images", icon: "🖼️" },
     { name: "Files", icon: "📁" },
