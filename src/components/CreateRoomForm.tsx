@@ -9,6 +9,7 @@ export type RoomFormData = {
 type Props = {
   onClose: () => void;
   onCreate: (data: RoomFormData) => void;
+  isCreating: boolean
 };
 
 export function CreateRoomForm({ onClose, onCreate }: Props) {

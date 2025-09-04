@@ -12,9 +12,13 @@ const languageMap: { [key: string]: number } = {
 export default function Compiler({
   code,
   language,
+  // onCompileStart,
+  // onCompileEnd,
 }: {
   code: string;
   language: string;
+  onCompileStart: () => void;
+  onCompileEnd: () => void;
 }) {
   const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);

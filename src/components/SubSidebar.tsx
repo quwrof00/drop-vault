@@ -11,6 +11,7 @@ interface SidebarProps {
   onDelete: (name: string) => void;
   currentItem: string;
   typeLabel: string; // e.g., "Note", "Snippet"
+  isCreating: boolean
 }
 
 const SubSidebar: React.FC<SidebarProps> = ({
